@@ -1,0 +1,101 @@
+{% extends 'appcomment/base.html' %}
+
+{% block title %}Mail List{% endblock %}
+
+{% block content %}
+    <form method="POST">
+        {% csrf_token %}
+        {{ diary_form.as_p }}
+        <input type="hidden" name="form-type" value="diary">
+        <button type="submit">Отправить</button>
+    </form>
+
+    {% if diary_app %}
+        {% for entry in diary_app %}
+            <div class = 'diary-container' id = 'diary-id-'+{{entry.id}}>
+                <hr>
+                <p><strong>{{ entry.user }}</strong> — {{ entry.created_at }}</p>
+                <p><strong>{{ entry.title }}</strong>: {{ entry.body }} <span class = 'like-btn' data-diary-id = {{entry.id}}>❤️</span></p>
+
+                {% if entry.user == request.user %}
+                    <a href="{% url 'update' entry.id %}">Редактировать</a>
+                    <a href="{% url 'delete' entry.id %}">Удалить</a>
+                {% endif %}
+
+                <!-- Кнопка показа формы -->
+                <a href="#" onclick="toggleForm({{ entry.id }}); return false;">Комментарий</a>
+            </div>
+
+            <!-- Комментарии -->
+            {% for comm in comment_app %}
+                <div class = 'comment-container' id ='comment-id-' + {{comm.id}}>
+                    {% if comm.diary_entry.id == entry.id %}
+                        <p style="margin-left: 20px;">🗨️ <strong>{{ comm.user }}</strong> — {{ comm.created_at }}<br>
+                        {{ comm.text }}</p>
+                    {% endif %}
+                </div>
+            {% endfor %}
+
+            <!-- Форма комментария (изначально скрыта) -->
+            <form id="comment-form-{{ entry.id }}" class="comment-form" method="POST" action="{% url 'add_comment' entry.id %}" style="display: none;">
+                {% csrf_token %}
+                {{ comment_form.as_p }}
+                <input type = 'hidden' name = 'diary_entry' value = {{entry.id}}>
+                <button type="submit">Отправить комментарий</button>
+            </form>
+        {% endfor %}
+    {% else %}
+        <h2>Пока нет ни одной записи</h2>
+    {% endif %}
+{% endblock %}
+
+{% block scripts %}
+<script>
+    function toggleForm(entry_id){
+        const form = document.getElementById('comment-form-' + entry_id);
+        if(form){
+            form.style.display = (form.style.display === 'none' || form.style.display === '') ? 'block' : 'none';
+        }
+    }
+
+    document.addEventListener('DOMContentLoaded', function () {
+    document.querySelectorAll('.like-btn').forEach(btn => {
+        btn.addEventListener('click', function () {
+            const commentId = this.dataset.commentId;
+
+            fetch('/like-comment/', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRFToken': getCookie('csrftoken')
+                },
+                body: JSON.stringify({ comment_id: commentId })
+            })
+            .then(res => res.json())
+            .then(data => {
+                document.getElementById(`like-count-${commentId}`).textContent = data.likes_count;
+            });
+        });
+    });
+    });
+
+// Функция получения CSRF токена (если ты её ещё не добавил)
+    function getCookie(name) {
+        let cookieValue = null;
+        if (document.cookie && document.cookie !== '') {
+            const cookies = document.cookie.split(';');
+            for (let i = 0; i < cookies.length; i++) {
+                const cookie = cookies[i].trim();
+                // Найти нужную куку
+                if (cookie.substring(0, name.length + 1) === (name + '=')) {
+                    cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+                    break;
+                }
+            }
+        }
+        return cookieValue;
+    }
+    
+</script>
+{% endblock %}
+
